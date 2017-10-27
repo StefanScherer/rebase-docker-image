@@ -65,18 +65,25 @@ const parseArgs = () => {
   options.images.target = parseImageArg(options.target);
   options.images.base = parseImageArg(options.base);
 
-  console.log(options);
+  if (options.verbose) {
+    console.log(options);
+  }
 };
 
 parseArgs();
 
 let bearer;
-let manifest;
-let digest;
-let config;
+let manifestSource;
+let configSource;
+let manifestSourceBase;
+let configSourceBase;
+let manifestTargetBase;
+let configTargetBase;
+let manifestTarget;
+let configTarget;
 let upload;
 
-const getToken = callback => {
+const getTokenForSourceImage = callback => {
   request(
     `https://auth.docker.io/token?account=${username}&scope=repository%3A${options.images.src.org}%2F${options.images.src.image}%3Apull&service=registry.docker.io`,
     {
@@ -97,7 +104,10 @@ const getToken = callback => {
   );
 };
 
-const getManifest = callback => {
+const getManifestOfSourceImage = callback => {
+  console.log(
+    `Retrieving information about source image ${options.images.src.org}/${options.images.src.image}:${options.images.src.tag}`
+  );
   request(
     {
       url: `https://registry-1.docker.io/v2/${options.images.src.org}/${options.images.src.image}/manifests/${options.images.src.tag}`,
@@ -113,17 +123,16 @@ const getManifest = callback => {
       if (err) {
         return callback(err);
       }
-      manifest = body;
-      digest = manifest.config.digest;
+      manifestSource = body;
       callback(null);
     }
   );
 };
 
-const getConfig = callback => {
+const getConfigOfSourceImage = callback => {
   request(
     {
-      url: `https://registry-1.docker.io/v2/${options.images.src.org}/${options.images.src.image}/blobs/${digest}`,
+      url: `https://registry-1.docker.io/v2/${options.images.src.org}/${options.images.src.image}/blobs/${manifestSource.config.digest}`,
       auth: {
         bearer
       },
@@ -134,16 +143,171 @@ const getConfig = callback => {
         return callback(err);
       }
       if (options.verbose) {
-        console.log('os:', body.os, 'os.version:', body['os.version']);
-        console.log('diff_ids:', body.rootfs.diff_ids);
+        console.log(
+          'src image os:',
+          body.os,
+          'os.version:',
+          body['os.version']
+        );
+        console.log('src image diff_ids:', body.rootfs.diff_ids);
       }
-      config = body;
+      configSource = body;
       callback(null);
     }
   );
 };
 
-const getPushToken = callback => {
+const getTokenForTargetBaseImage = callback => {
+  request(
+    `https://auth.docker.io/token?account=${username}&scope=repository%3A${options.images.base.org}%2F${options.images.base.image}%3Apull&service=registry.docker.io`,
+    {
+      json: true,
+      auth: {
+        username,
+        password,
+        sendImmediately: false
+      }
+    },
+    (err, res, body) => {
+      if (err) {
+        return callback(err);
+      }
+      bearer = body.token;
+      callback(null);
+    }
+  );
+};
+
+const getManifestOfTargetBaseImage = callback => {
+  console.log(
+    `Retrieving information about target base image ${options.images.base.org}/${options.images.base.image}:${options.images.base.tag}`
+  );
+  request(
+    {
+      url: `https://registry-1.docker.io/v2/${options.images.base.org}/${options.images.base.image}/manifests/${options.images.base.tag}`,
+      auth: {
+        bearer
+      },
+      json: true,
+      headers: {
+        Accept: 'application/vnd.docker.distribution.manifest.v2+json'
+      }
+    },
+    (err, res, body) => {
+      if (err) {
+        return callback(err);
+      }
+      manifestTargetBase = body;
+      console.log('target base image manifest:', manifestTargetBase);
+      callback(null);
+    }
+  );
+};
+
+const getConfigOfTargetBaseImage = callback => {
+  request(
+    {
+      url: `https://registry-1.docker.io/v2/${options.images.base.org}/${options.images.base.image}/blobs/${manifestTargetBase.config.digest}`,
+      auth: {
+        bearer
+      },
+      json: true
+    },
+    (err, res, body) => {
+      if (err) {
+        return callback(err);
+      }
+      if (options.verbose) {
+        console.log(
+          'target base image os:',
+          body.os,
+          'os.version:',
+          body['os.version']
+        );
+        console.log('target base image diff_ids:', body.rootfs.diff_ids);
+      }
+      configTargetBase = body;
+      callback(null);
+    }
+  );
+};
+
+const getTokenForSourceBaseImage = callback => {
+  request(
+    `https://auth.docker.io/token?account=${username}&scope=repository%3A${options.images.base.org}%2F${options.images.base.image}%3Apull&service=registry.docker.io`,
+    {
+      json: true,
+      auth: {
+        username,
+        password,
+        sendImmediately: false
+      }
+    },
+    (err, res, body) => {
+      if (err) {
+        return callback(err);
+      }
+      bearer = body.token;
+      callback(null);
+    }
+  );
+};
+
+const getManifestOfSourceBaseImage = callback => {
+  console.log(
+    `Retrieving information about source base image ${options.images.base.org}/${options.images.base.image}:${configSource['os.version']}`
+  );
+  request(
+    {
+      url: `https://registry-1.docker.io/v2/${options.images.base.org}/${options.images.base.image}/manifests/${configSource['os.version']}`,
+      auth: {
+        bearer
+      },
+      json: true,
+      headers: {
+        Accept: 'application/vnd.docker.distribution.manifest.v2+json'
+      }
+    },
+    (err, res, body) => {
+      if (err) {
+        return callback(err);
+      }
+      manifestSourceBase = body;
+      console.log('src base image manifest:', manifestSourceBase);
+      callback(null);
+    }
+  );
+};
+
+const getConfigOfSourceBaseImage = callback => {
+  request(
+    {
+      url: `https://registry-1.docker.io/v2/${options.images.base.org}/${options.images.base.image}/blobs/${manifestSourceBase.config.digest}`,
+      auth: {
+        bearer
+      },
+      json: true
+    },
+    (err, res, body) => {
+      if (err) {
+        return callback(err);
+      }
+      if (options.verbose) {
+        console.log(
+          'src base image os:',
+          body.os,
+          'os.version:',
+          body['os.version']
+        );
+        console.log('src base image diff_ids:', body.rootfs.diff_ids);
+      }
+      configSourceBase = body;
+      callback(null);
+    }
+  );
+};
+
+const getTokenForTargetImage = callback => {
   request(
     `https://auth.docker.io/token?account=${username}&scope=repository%3A${options.images.target.org}%2F${options.images.target.image}%3Apush%2Cpull&service=registry.docker.io`,
     {
@@ -165,6 +329,9 @@ const getPushToken = callback => {
 };
 
 const beginUpload = callback => {
+  console.log(
+    `Pushing target image ${options.images.target.org}/${options.images.target.image}:${options.images.target.tag}`
+  );
   request(
     {
       method: 'POST',
@@ -186,29 +353,78 @@ const beginUpload = callback => {
   );
 };
 
-const uploadConfig = callback => {
-  config['os.version'] = '10.0.14393.1770';
-  let data = JSON.stringify(config);
-  manifest.config.digest = 'sha256:' + sha256(data);
-  manifest.config.size = data.length;
-  if (config.verbose) {
-    console.log('config:', config);
-    console.log('new digest:', manifest.config.digest);
+const rebaseBaseImages = callback => {
+  console.log('Rebasing image');
+  configTarget = configSource;
+  manifestTarget = manifestSource;
+
+  console.log('current config:', configTarget);
+
+  configTarget['os.version'] = configTargetBase['os.version'];
+
+  if (options.verbose) {
+    console.log('old base layers:', manifestSourceBase.layers);
+  }
+  if (manifestTarget.layers[0].digest !== manifestSourceBase.layers[0].digest) {
+    return callback(new Error('Base layer digest mismatch.'));
+  }
+
+  if (options.verbose) {
+    console.log('current layers:', manifestTarget.layers);
+  }
+
+  manifestTarget.layers.splice.apply(
+    manifestTarget.layers,
+    [0, manifestSourceBase.layers.length].concat(manifestTargetBase.layers)
+  );
+
+  if (options.verbose) {
+    console.log('rebased layers:', manifestTarget.layers);
+
+    console.log('current diff_ids:', configTarget.rootfs.diff_ids);
+  }
+  configTarget.rootfs.diff_ids.splice.apply(
+    configTarget.rootfs.diff_ids,
+    [0, configSourceBase.rootfs.diff_ids.length].concat(
+      configTargetBase.rootfs.diff_ids
+    )
+  );
+
+  //  console.log('source base image diff_ids:', configSourceBase.rootfs.diff_ids);
+  //  console.log('target base image diff_ids:', configTargetBase.rootfs.diff_ids);
+
+  if (options.verbose) {
+    console.log('rebased diff_ids:', configTarget.rootfs.diff_ids);
+  }
+  console.log('rebased config:', configTarget);
+
+  let data = JSON.stringify(configTarget);
+  manifestTarget.config.digest = 'sha256:' + sha256(data);
+  manifestTarget.config.size = data.length;
+
+  callback(null);
+};
+
+const uploadConfigForTargetImage = callback => {
+  if (options.verbose) {
+    console.log('target image config:', configTarget);
+    console.log('target image digest:', manifestTarget.config.digest);
   }
   request(
     {
       method: 'PUT',
-      url: `${upload}&digest=${manifest.config.digest}`,
+      url: `${upload}&digest=${manifestTarget.config.digest}`,
       auth: {
         bearer
       },
       json: true,
-      body: config
+      body: configTarget
     },
     (err, res, body) => {
       if (err) {
         return callback(err);
       }
+      console.log(res);
       if (res.statusCode !== 201) {
         return callback(new Error(body));
       }
@@ -221,11 +437,11 @@ const uploadConfig = callback => {
   );
 };
 
-const checkConfigBlob = callback => {
+const checkConfigOfTargetImage = callback => {
   request(
     {
       method: 'HEAD',
-      url: `https://registry-1.docker.io/v2/${options.images.target.org}/${options.images.target.image}/blobs/${manifest.config.digest}`,
+      url: `https://registry-1.docker.io/v2/${options.images.target.org}/${options.images.target.image}/blobs/${manifestTarget.config.digest}`,
       auth: {
         bearer
       }
@@ -245,8 +461,10 @@ const checkConfigBlob = callback => {
   );
 };
 
-const uploadManifest = callback => {
-  console.log('manifest', JSON.stringify(manifest));
+const uploadManifestForTargetImage = callback => {
+  if (options.verbose) {
+    console.log('target image manifest:', JSON.stringify(manifestTarget));
+  }
   request(
     {
       method: 'PUT',
@@ -257,7 +475,7 @@ const uploadManifest = callback => {
       headers: {
         'content-type': 'application/vnd.docker.distribution.manifest.v2+json'
       },
-      body: JSON.stringify(manifest, null, 4)
+      body: JSON.stringify(manifestTarget, null, 4)
     },
     (err, res, body) => {
       if (err) {
@@ -277,14 +495,24 @@ const uploadManifest = callback => {
 
 async.series(
   [
-    getToken,
-    getManifest,
-    getConfig,
-    getPushToken,
+    getTokenForSourceImage,
+    getManifestOfSourceImage,
+    getConfigOfSourceImage,
+
+    getTokenForSourceBaseImage,
+    getManifestOfSourceBaseImage,
+    getConfigOfSourceBaseImage,
+
+    getTokenForTargetBaseImage,
+    getManifestOfTargetBaseImage,
+    getConfigOfTargetBaseImage,
+
+    getTokenForTargetImage,
+    rebaseBaseImages,
     beginUpload,
-    uploadConfig,
-    checkConfigBlob,
-    uploadManifest,
+    uploadConfigForTargetImage,
+    checkConfigOfTargetImage,
+    uploadManifestForTargetImage,
 
     callback => {
       console.log('Done.');
