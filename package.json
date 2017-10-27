@@ -9,7 +9,7 @@
   "author": "Stefan Scherer",
   "license": "MIT",
   "bin": {
-    "rebase-docker-image", "index.js"
+    "rebase-docker-image": "index.js"
   },
   "dependencies": {
     "async": "2.5.0",
