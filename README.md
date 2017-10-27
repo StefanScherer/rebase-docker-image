@@ -12,7 +12,8 @@ Windows base images of existing apps on the Docker Hub.
 - Make images usable again that you have built with Insider.
 - Provide your app for all available Windows Update layers to avoid download.
 - Sync multiple images based on different Windows Update layers to the current.
-- Can be used from Linux as no images have to be pulled.
+- Create images for Server 1709 without having a machine for it.
+- The tool can also be used on Linux as no images have to be pulled.
 
 ## Limits
 
