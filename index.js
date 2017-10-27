@@ -116,15 +116,31 @@ const getManifestOfSourceImage = callback => {
       },
       json: true,
       headers: {
-        Accept: 'application/vnd.docker.distribution.manifest.v2+json'
+        Accept: 'application/vnd.docker.distribution.manifest.v2+json, application/vnd.docker.distribution.manifest.list.v2+json'
       }
     },
     (err, res, body) => {
       if (err) {
         return callback(err);
       }
-      manifestSource = body;
-      callback(null);
+      if (
+        body.mediaType ===
+        'application/vnd.docker.distribution.manifest.list.v2+json'
+      ) {
+        options.images.src.tag = body.manifests[0].digest;
+        getManifestOfSourceImage(() => {
+          if (options.verbose) {
+            console.log('source manifest:', manifestSource);
+          }
+          return callback(null);
+        });
+      } else {
+        manifestSource = body;
+        if (options.verbose) {
+          console.log('source manifest:', manifestSource);
+        }
+        callback(null);
+      }
     }
   );
 };
@@ -198,7 +214,9 @@ const getManifestOfTargetBaseImage = callback => {
         return callback(err);
       }
       manifestTargetBase = body;
-      console.log('target base image manifest:', manifestTargetBase);
+      if (options.verbose) {
+        console.log('target base image manifest:', manifestTargetBase);
+      }
       callback(null);
     }
   );
@@ -273,7 +291,9 @@ const getManifestOfSourceBaseImage = callback => {
         return callback(err);
       }
       manifestSourceBase = body;
-      console.log('src base image manifest:', manifestSourceBase);
+      if (options.verbose) {
+        console.log('src base image manifest:', manifestSourceBase);
+      }
       callback(null);
     }
   );
@@ -309,7 +329,7 @@ const getConfigOfSourceBaseImage = callback => {
 
 const getTokenForTargetImage = callback => {
   request(
-    `https://auth.docker.io/token?account=${username}&scope=repository%3A${options.images.target.org}%2F${options.images.target.image}%3Apush%2Cpull&service=registry.docker.io`,
+    `https://auth.docker.io/token?account=${username}&scope=repository%3A${options.images.target.org}%2F${options.images.target.image}%3Apush%2Cpull&scope=repository%3A${options.images.src.org}%2F${options.images.src.image}%3Apull&service=registry.docker.io`,
     {
       json: true,
       auth: {
@@ -358,7 +378,9 @@ const rebaseBaseImages = callback => {
   configTarget = configSource;
   manifestTarget = manifestSource;
 
-  console.log('current config:', configTarget);
+  if (options.verbose) {
+    console.log('current config:', configTarget);
+  }
 
   configTarget['os.version'] = configTargetBase['os.version'];
 
@@ -380,7 +402,6 @@ const rebaseBaseImages = callback => {
 
   if (options.verbose) {
     console.log('rebased layers:', manifestTarget.layers);
-
     console.log('current diff_ids:', configTarget.rootfs.diff_ids);
   }
   configTarget.rootfs.diff_ids.splice.apply(
@@ -390,13 +411,10 @@ const rebaseBaseImages = callback => {
     )
   );
 
-  //  console.log('source base image diff_ids:', configSourceBase.rootfs.diff_ids);
-  //  console.log('target base image diff_ids:', configTargetBase.rootfs.diff_ids);
-
   if (options.verbose) {
     console.log('rebased diff_ids:', configTarget.rootfs.diff_ids);
+    console.log('rebased config:', configTarget);
   }
-  console.log('rebased config:', configTarget);
 
   let data = JSON.stringify(configTarget);
   manifestTarget.config.digest = 'sha256:' + sha256(data);
@@ -424,13 +442,11 @@ const uploadConfigForTargetImage = callback => {
       if (err) {
         return callback(err);
       }
-      console.log(res);
-      if (res.statusCode !== 201) {
-        return callback(new Error(body));
-      }
       if (options.verbose) {
         console.log(res.statusCode);
-        //          console.log(res);
+      }
+      if (res.statusCode !== 201) {
+        return callback(new Error(body));
       }
       callback(null);
     }
@@ -461,6 +477,73 @@ const checkConfigOfTargetImage = callback => {
   );
 };
 
+const mountLayersForTargetImage = callback => {
+  if (options.verbose) {
+    console.log('target image layers:', JSON.stringify(manifestTarget.layers));
+  }
+
+  async.eachSeries(
+    manifestTarget.layers,
+    (layer, eachCallback) => {
+      if (
+        layer.mediaType ===
+        'application/vnd.docker.image.rootfs.foreign.diff.tar.gzip'
+      ) {
+        return eachCallback(null);
+      }
+      request(
+        {
+          method: 'HEAD',
+          url: `https://registry-1.docker.io/v2/${options.images.target.org}/${options.images.target.image}/blobs/${layer.digest}`,
+          auth: {
+            bearer
+          }
+        },
+        (err, res, body) => {
+          if (err) {
+            return eachCallback(err);
+          }
+          if (res.statusCode !== 200 && res.statusCode !== 404) {
+            return eachCallback(new Error(body));
+          }
+          if (res.statusCode === 404) {
+            console.log(
+              `Mounting ${layer.digest} from ${options.images.src.org}/${options.images.src.image}`
+            );
+            request(
+              {
+                method: 'POST',
+                url: `https://registry-1.docker.io/v2/${options.images.target.org}/${options.images.target.image}/blobs/uploads/?from=${options.images.src.org}%2F${options.images.src.image}&mount=${layer.digest}`,
+                auth: {
+                  bearer
+                },
+                headers: {
+                  'Content-Length': 0
+                }
+              },
+              (errPost, resPost, bodyPost) => {
+                if (errPost) {
+                  return eachCallback(errPost);
+                }
+                if (resPost.statusCode !== 201) {
+                  return eachCallback(new Error(bodyPost));
+                }
+                return eachCallback(null);
+              }
+            );
+          } else {
+            // console.log('huhu');
+            eachCallback(null);
+          }
+        }
+      );
+    },
+    errMount => {
+      callback(errMount);
+    }
+  );
+};
+
 const uploadManifestForTargetImage = callback => {
   if (options.verbose) {
     console.log('target image manifest:', JSON.stringify(manifestTarget));
@@ -486,7 +569,6 @@ const uploadManifestForTargetImage = callback => {
       }
       if (options.verbose) {
         console.log(res.statusCode);
-        //          console.log(res);
       }
       callback(null);
     }
@@ -512,6 +594,7 @@ async.series(
     beginUpload,
     uploadConfigForTargetImage,
     checkConfigOfTargetImage,
+    mountLayersForTargetImage,
     uploadManifestForTargetImage,
 
     callback => {
