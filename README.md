@@ -18,6 +18,7 @@ Windows base images of existing apps on the Docker Hub.
 ## Limits
 
 - You cannot move an app from a windowsservercore image to the nanoserver image.
+- You cannot rebase windowsservercore image with `RUN` instructions to 1709. Only `COPY` and `ENV` seem to be fine.
 - You also cannot move PowerShell scripts into the 1709 nanoserver image as there is no PowerShell installed.
 - Be warned that this tool may create corrupt images.
 
