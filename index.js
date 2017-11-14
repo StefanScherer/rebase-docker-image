@@ -12,7 +12,8 @@ const commandLineArgs = require('command-line-args');
 
 const optionDefinitions = [
   { name: 'verbose', alias: 'v', type: Boolean },
-  { name: 'src', alias: 's', type: String, defaultOption: true },
+  { name: 'src', type: String, defaultOption: true },
+  { name: 'srcbase', alias: 's', type: String },
   { name: 'target', alias: 't', type: String },
   { name: 'base', alias: 'b', type: String },
   { name: 'help', alias: 'h', type: Boolean }
@@ -26,6 +27,9 @@ const showUsage = () => {
 };
 
 const parseImageArg = imagename => {
+  if (!imagename) {
+    return;
+  }
   let found = imagename.match(/^([^\/:]+)\/([^:]+):(.*)$/);
   if (found) {
     return { org: found[1], image: found[2], tag: found[3] };
@@ -63,6 +67,7 @@ const parseArgs = () => {
 
   options.images = {};
   options.images.src = parseImageArg(options.src);
+  options.images.srcbase = parseImageArg(options.srcbase);
   options.images.target = parseImageArg(options.target);
   options.images.base = parseImageArg(options.base);
 
@@ -251,9 +256,15 @@ const getConfigOfTargetBaseImage = callback => {
   );
 };
 
+const matchSourceBaseImage = callback => {
+  if (!options.images.srcbase || !options.images.srcbase.org) {
+    options.images.srcbase = options.images.base;
+  }
+};
+
 const getTokenForSourceBaseImage = callback => {
   request(
-    `https://auth.docker.io/token?account=${username}&scope=repository%3A${options.images.base.org}%2F${options.images.base.image}%3Apull&service=registry.docker.io`,
+    `https://auth.docker.io/token?account=${username}&scope=repository%3A${options.images.srcbase.org}%2F${options.images.srcbase.image}%3Apull&service=registry.docker.io`,
     {
       json: true,
       auth: {
@@ -274,11 +285,11 @@ const getTokenForSourceBaseImage = callback => {
 
 const getManifestOfSourceBaseImage = callback => {
   console.log(
-    `Retrieving information about source base image ${options.images.base.org}/${options.images.base.image}:${configSource['os.version']}`
+    `Retrieving information about source base image ${options.images.srcbase.org}/${options.images.srcbase.image}:${configSource['os.version']}`
   );
   request(
     {
-      url: `https://registry-1.docker.io/v2/${options.images.base.org}/${options.images.base.image}/manifests/${configSource['os.version']}`,
+      url: `https://registry-1.docker.io/v2/${options.images.srcbase.org}/${options.images.srcbase.image}/manifests/${configSource['os.version']}`,
       auth: {
         bearer
       },
@@ -303,7 +314,7 @@ const getManifestOfSourceBaseImage = callback => {
 const getConfigOfSourceBaseImage = callback => {
   request(
     {
-      url: `https://registry-1.docker.io/v2/${options.images.base.org}/${options.images.base.image}/blobs/${manifestSourceBase.config.digest}`,
+      url: `https://registry-1.docker.io/v2/${options.images.srcbase.org}/${options.images.srcbase.image}/blobs/${manifestSourceBase.config.digest}`,
       auth: {
         bearer
       },
@@ -410,6 +421,11 @@ const rebaseBaseImages = callback => {
     [0, configSourceBase.rootfs.diff_ids.length].concat(
       configTargetBase.rootfs.diff_ids
     )
+  );
+
+  configTarget.history.splice.apply(
+    configTarget.history,
+    [0, configSourceBase.history.length].concat(configTargetBase.history)
   );
 
   if (options.verbose) {

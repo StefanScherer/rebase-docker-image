@@ -40,6 +40,8 @@ It also needs two environment variables `DOCKER_USER` and `DOCKER_PASS` to push 
 
 ## Example
 
+### Nanoserver 2016 -> 1709
+
 Let's modernize or update golang from the 10.0.14393.x base image to the 1709 variant.
 
 ```
@@ -48,6 +50,21 @@ $ rebase-docker-image \
     -t stefanscherer/golang-windows:1.9-nanoserver-1709 \
     -b microsoft/nanoserver:1709
 ```
+
+### Nanoserver 2016 -> Insider 17035
+
+Let's modernize or update winspector from the 10.0.14393.x base image to the Insider 17035 variant.
+
+```
+$ rebase-docker-image \
+    stefanscherer/winspector:windows-2.0.0-2016 \
+    -s microsoft/nanoserver:10.0.14393.1770 \
+    -t stefanscherer/winspector:insider-17035 \
+    -b microsoft/nanoserver-insider:10.0.17035.1000
+```
+
+Changing from a different base image repo to another we have to specify with `-s` the source base image repo and tag. In this case the two base image layers are replaced by the single insider base image layer.
+
 
 ### Run it in a container
 
