@@ -260,6 +260,7 @@ const matchSourceBaseImage = callback => {
   if (!options.images.srcbase || !options.images.srcbase.org) {
     options.images.srcbase = options.images.base;
   }
+  callback(null);
 };
 
 const getTokenForSourceBaseImage = callback => {
@@ -598,6 +599,7 @@ async.series(
     getManifestOfSourceImage,
     getConfigOfSourceImage,
 
+    matchSourceBaseImage,
     getTokenForSourceBaseImage,
     getManifestOfSourceBaseImage,
     getConfigOfSourceBaseImage,
