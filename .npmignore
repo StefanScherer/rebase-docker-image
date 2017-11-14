@@ -1,0 +1,4 @@
+Dockerfile*
+.dockerignore
+download-layer/
+test-windowsservercore/
