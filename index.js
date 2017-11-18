@@ -259,6 +259,7 @@ const getConfigOfTargetBaseImage = callback => {
 const matchSourceBaseImage = callback => {
   if (!options.images.srcbase || !options.images.srcbase.org) {
     options.images.srcbase = options.images.base;
+    options.images.srcbase.tag = configSource['os.version'];
   }
   callback(null);
 };
@@ -286,11 +287,11 @@ const getTokenForSourceBaseImage = callback => {
 
 const getManifestOfSourceBaseImage = callback => {
   console.log(
-    `Retrieving information about source base image ${options.images.srcbase.org}/${options.images.srcbase.image}:${configSource['os.version']}`
+    `Retrieving information about source base image ${options.images.srcbase.org}/${options.images.srcbase.image}:${options.images.srcbase.tag}`
   );
   request(
     {
-      url: `https://registry-1.docker.io/v2/${options.images.srcbase.org}/${options.images.srcbase.image}/manifests/${configSource['os.version']}`,
+      url: `https://registry-1.docker.io/v2/${options.images.srcbase.org}/${options.images.srcbase.image}/manifests/${options.images.srcbase.tag}`,
       auth: {
         bearer
       },
