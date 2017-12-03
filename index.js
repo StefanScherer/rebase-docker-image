@@ -2,28 +2,86 @@
 'use strict';
 
 const async = require('async');
+const commandLineArgs = require('command-line-args');
+const getUsage = require('command-line-usage');
 const request = require('request');
 const sha256 = require('sha256');
 
 const username = process.env.DOCKER_USER || 'username';
 const password = process.env.DOCKER_PASS || 'password';
 
-const commandLineArgs = require('command-line-args');
-
 const optionDefinitions = [
-  { name: 'verbose', alias: 'v', type: Boolean },
-  { name: 'src', type: String, defaultOption: true },
-  { name: 'srcbase', alias: 's', type: String },
-  { name: 'target', alias: 't', type: String },
-  { name: 'base', alias: 'b', type: String },
-  { name: 'help', alias: 'h', type: Boolean }
+  {
+    name: 'verbose',
+    alias: 'v',
+    type: Boolean,
+    description: 'Show more output.'
+  },
+  {
+    name: 'src',
+    type: String,
+    defaultOption: true,
+    description: 'Source image for the rebase.'
+  },
+  {
+    name: 'srcbase',
+    alias: 's',
+    type: String,
+    description:
+      'If name target base image differs from source image, you can specify the source base image.'
+  },
+  {
+    name: 'target',
+    alias: 't',
+    type: String,
+    description: 'The target image name and tag after the rebase.'
+  },
+  {
+    name: 'targetbase',
+    alias: 'b',
+    type: String,
+    description: 'The target base image that replaces the source base image.'
+  },
+  {
+    name: 'help',
+    alias: 'h',
+    type: Boolean,
+    description: 'Print this usage guide.'
+  },
+  {
+    name: 'version',
+    type: Boolean,
+    description: 'Print the version of this tool.'
+  }
 ];
 
 const options = commandLineArgs(optionDefinitions);
 
 const showUsage = () => {
-  console.log('Usage: rebase-docker-image src -t target -b base');
-  process.exit(1);
+  const sections = [
+    {
+      header: 'rebase-docker-image',
+      content:
+        'Rebase a dockerized Windows app to a newer Windows Docker base image. The rebase happens directly in Docker Hub, so no images have to be pulled and you can run this tool on a non-Windows platform.'
+    },
+    {
+      header: 'Synopsis',
+      content: [
+        '$ rebase-docker-image [[bold]{--src}] [underline]{golang:nanoserver-sac2016} [bold]{--target} [underline]{my/golang:nanoserver-1709} [bold]{--targetbase} [underline]{microsoft/nanoserver:1709}'
+      ]
+    },
+    {
+      header: 'Options',
+      optionList: optionDefinitions
+    }
+  ];
+  console.log(getUsage(sections));
+  process.exit(0);
+};
+
+const showVersion = () => {
+  console.log(require('./package.json').version);
+  process.exit(0);
 };
 
 const parseImageArg = imagename => {
@@ -49,20 +107,23 @@ const parseArgs = () => {
   if (options.help) {
     showUsage();
   }
+  if (options.version) {
+    showVersion();
+  }
 
   if (!options.src) {
     console.log('Error: src image missing.');
-    showUsage();
+    process.exit(1);
   }
 
   if (!options.target) {
     console.log('Error: target image missing.');
-    showUsage();
+    process.exit(1);
   }
 
   if (!options.base) {
     console.log('Error: base image missing.');
-    showUsage();
+    process.exit(1);
   }
 
   options.images = {};
