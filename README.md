@@ -31,8 +31,31 @@ npm install -g rebase-docker-image
 ## Usage
 
 ```
-C:\> rebase-docker-image -h
-Usage: rebase-docker-image src -t target -b base
+$ rebase-docker-image -h
+
+rebase-docker-image
+
+  Rebase a dockerized Windows app to a newer Windows Docker base image. The     
+  rebase happens directly in Docker Hub, so no images have to be pulled and you 
+  can run this tool on a non-Windows platform. You have to set the environment  
+  variables DOCKER_USER and DOCKER_PASS to push the target manifest to Docker   
+  Hub.                                                                          
+
+Synopsis
+
+  $ rebase-docker-image [--src] golang:nanoserver-sac2016 --target              
+  my/golang:nanoserver-1709 --targetbase microsoft/nanoserver:1709              
+
+Options
+
+  -v, --verbose             Show more output.                                                             
+  --src string              Source image for the rebase.                                                  
+  -s, --srcbase string      If name target base image differs from source image, you can specify the      
+                            source base image.                                                            
+  -t, --target string       The target image name and tag after the rebase.                               
+  -b, --targetbase string   The target base image that replaces the source base image.                    
+  -h, --help                Print this usage guide.                                                       
+  --version                 Print the version of this tool.                                               
 ```
 
 It also needs two environment variables `DOCKER_USER` and `DOCKER_PASS` to push the target image.
