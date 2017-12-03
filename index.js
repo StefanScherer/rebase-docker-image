@@ -121,8 +121,8 @@ const parseArgs = () => {
     process.exit(1);
   }
 
-  if (!options.base) {
-    console.log('Error: base image missing.');
+  if (!options.targetbase) {
+    console.log('Error: target base image missing.');
     process.exit(1);
   }
 
@@ -130,7 +130,7 @@ const parseArgs = () => {
   options.images.src = parseImageArg(options.src);
   options.images.srcbase = parseImageArg(options.srcbase);
   options.images.target = parseImageArg(options.target);
-  options.images.base = parseImageArg(options.base);
+  options.images.targetbase = parseImageArg(options.targetbase);
 
   if (options.verbose) {
     console.log(options);
@@ -252,8 +252,8 @@ const getConfigOfSourceImage = callback => {
 const getTokenForTargetBaseImage = callback => {
   request(
     `https://auth.docker.io/token?account=${username}&scope=repository%3A${
-      options.images.base.org
-    }%2F${options.images.base.image}%3Apull&service=registry.docker.io`,
+      options.images.targetbase.org
+    }%2F${options.images.targetbase.image}%3Apull&service=registry.docker.io`,
     {
       json: true,
       auth: {
@@ -275,14 +275,14 @@ const getTokenForTargetBaseImage = callback => {
 const getManifestOfTargetBaseImage = callback => {
   console.log(
     `Retrieving information about target base image ${
-      options.images.base.org
-    }/${options.images.base.image}:${options.images.base.tag}`
+      options.images.targetbase.org
+    }/${options.images.targetbase.image}:${options.images.targetbase.tag}`
   );
   request(
     {
-      url: `https://registry-1.docker.io/v2/${options.images.base.org}/${
-        options.images.base.image
-      }/manifests/${options.images.base.tag}`,
+      url: `https://registry-1.docker.io/v2/${options.images.targetbase.org}/${
+        options.images.targetbase.image
+      }/manifests/${options.images.targetbase.tag}`,
       auth: {
         bearer
       },
@@ -307,8 +307,8 @@ const getManifestOfTargetBaseImage = callback => {
 const getConfigOfTargetBaseImage = callback => {
   request(
     {
-      url: `https://registry-1.docker.io/v2/${options.images.base.org}/${
-        options.images.base.image
+      url: `https://registry-1.docker.io/v2/${options.images.targetbase.org}/${
+        options.images.targetbase.image
       }/blobs/${manifestTargetBase.config.digest}`,
       auth: {
         bearer
@@ -336,7 +336,7 @@ const getConfigOfTargetBaseImage = callback => {
 
 const matchSourceBaseImage = callback => {
   if (!options.images.srcbase || !options.images.srcbase.org) {
-    options.images.srcbase = Object.assign({}, options.images.base);
+    options.images.srcbase = Object.assign({}, options.images.targetbase);
     options.images.srcbase.tag = configSource['os.version'];
   }
   callback(null);
