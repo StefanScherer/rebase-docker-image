@@ -1,6 +1,6 @@
 {
   "name": "rebase-docker-image",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "description": "Rebase a Windows Docker image",
   "main": "index.js",
   "scripts": {
