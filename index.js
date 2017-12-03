@@ -62,7 +62,7 @@ const showUsage = () => {
     {
       header: 'rebase-docker-image',
       content:
-        'Rebase a dockerized Windows app to a newer Windows Docker base image. The rebase happens directly in Docker Hub, so no images have to be pulled and you can run this tool on a non-Windows platform.'
+        'Rebase a dockerized Windows app to a newer Windows Docker base image. The rebase happens directly in Docker Hub, so no images have to be pulled and you can run this tool on a non-Windows platform. You have to set the environment variables DOCKER_USER and DOCKER_PASS to push the target manifest to Docker Hub.'
     },
     {
       header: 'Synopsis',
