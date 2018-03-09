@@ -433,7 +433,9 @@ const getTokenForTargetImage = callback => {
       options.images.target.org
     }%2F${options.images.target.image}%3Apush%2Cpull&scope=repository%3A${
       options.images.src.org
-    }%2F${options.images.src.image}%3Apull&service=registry.docker.io`,
+    }%2F${options.images.src.image}%3Apull&scope=repository%3A${
+      options.images.targetbase.org
+    }%2F${options.images.targetbase.image}%3Apull&service=registry.docker.io`,
     {
       json: true,
       auth: {
@@ -649,7 +651,38 @@ const mountLayersForTargetImage = callback => {
                   return eachCallback(errPost);
                 }
                 if (resPost.statusCode !== 201) {
-                  return eachCallback(new Error(bodyPost));
+                  console.log(
+                    `Mounting ${layer.digest} from ${
+                      options.images.targetbase.org
+                    }/${options.images.targetbase.image}`
+                  );
+                  return request(
+                    {
+                      method: 'POST',
+                      url: `https://registry-1.docker.io/v2/${
+                        options.images.target.org
+                      }/${options.images.target.image}/blobs/uploads/?from=${
+                        options.images.targetbase.org
+                      }%2F${options.images.targetbase.image}&mount=${
+                        layer.digest
+                      }`,
+                      auth: {
+                        bearer
+                      },
+                      headers: {
+                        'Content-Length': 0
+                      }
+                    },
+                    (errBasePost, resBasePost, bodyBasePost) => {
+                      if (errBasePost) {
+                        return eachCallback(errBasePost);
+                      }
+                      if (resBasePost.statusCode !== 201) {
+                        return eachCallback(new Error(bodyBasePost));
+                      }
+                      return eachCallback(null);
+                    }
+                  );
                 }
                 return eachCallback(null);
               }
