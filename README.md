@@ -1,4 +1,6 @@
 # rebase-docker-image
+![npm](https://img.shields.io/npm/v/rebase-docker-image.svg)
+
 Rebase a dockerized Windows app to a newer Windows Docker base image.
 
 ## Introduction
