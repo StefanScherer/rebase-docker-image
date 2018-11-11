@@ -67,7 +67,7 @@ const showUsage = () => {
     {
       header: 'Synopsis',
       content: [
-        '$ rebase-docker-image [[bold]{--src}] [underline]{golang:nanoserver-sac2016} [bold]{--target} [underline]{my/golang:nanoserver-1709} [bold]{--targetbase} [underline]{microsoft/nanoserver:1709}'
+        '$ rebase-docker-image [{bold --src}] {underline golang:nanoserver-sac2016} {bold --target} {underline my/golang:nanoserver-1709} {bold --targetbase} {underline microsoft/nanoserver:1709}'
       ]
     },
     {

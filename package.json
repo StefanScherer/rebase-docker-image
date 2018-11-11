@@ -12,10 +12,10 @@
     "rebase-docker-image": "index.js"
   },
   "dependencies": {
-    "async": "2.6.0",
-    "command-line-args": "4.0.7",
-    "command-line-usage": "4.0.1",
-    "request": "2.83.0",
+    "async": "2.6.1",
+    "command-line-args": "5.0.2",
+    "command-line-usage": "5.0.5",
+    "request": "2.88.0",
     "sha256": "0.2.0"
   }
 }
