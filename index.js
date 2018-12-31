@@ -7,6 +7,8 @@ const getUsage = require('command-line-usage');
 const request = require('request');
 const sha256 = require('sha256');
 
+const parseImage = require('./lib/parseImage');
+
 const username = process.env.DOCKER_USER || 'username';
 const password = process.env.DOCKER_PASS || 'password';
 
@@ -84,25 +86,6 @@ const showVersion = () => {
   process.exit(0);
 };
 
-const parseImageArg = imagename => {
-  if (!imagename) {
-    return;
-  }
-  let found = imagename.match(/^([^\/:]+)\/([^:]+):(.*)$/);
-  if (found) {
-    return { org: found[1], image: found[2], tag: found[3] };
-  }
-  found = imagename.match(/^([^\/:]+)\/([^:]+)$/);
-  if (found) {
-    return { org: found[1], image: found[2], tag: 'latest' };
-  }
-  found = imagename.match(/^([^\/:]+):(.*)$/);
-  if (found) {
-    return { org: 'library', image: found[1], tag: found[2] };
-  }
-  return { org: 'library', image: imagename, tag: 'latest' };
-};
-
 const parseArgs = () => {
   if (options.help) {
     showUsage();
@@ -127,10 +110,10 @@ const parseArgs = () => {
   }
 
   options.images = {};
-  options.images.src = parseImageArg(options.src);
-  options.images.srcbase = parseImageArg(options.srcbase);
-  options.images.target = parseImageArg(options.target);
-  options.images.targetbase = parseImageArg(options.targetbase);
+  options.images.src = parseImage(options.src);
+  options.images.srcbase = parseImage(options.srcbase);
+  options.images.target = parseImage(options.target);
+  options.images.targetbase = parseImage(options.targetbase);
 
   if (options.verbose) {
     console.log(options);
@@ -151,6 +134,11 @@ let configTarget;
 let upload;
 
 const getTokenForSourceImage = callback => {
+  if (options.images.src.registry !== 'registry-1.docker.io') {
+    bearer = '';
+    return callback(null);
+  }
+
   request(
     `https://auth.docker.io/token?account=${username}&scope=repository%3A${
       options.images.src.org
@@ -181,9 +169,7 @@ const getManifestOfSourceImage = callback => {
   );
   request(
     {
-      url: `https://registry-1.docker.io/v2/${options.images.src.org}/${
-        options.images.src.image
-      }/manifests/${options.images.src.tag}`,
+      url: `https://${options.images.src.registry}/v2/${options.images.src.imagepath}/manifests/${options.images.src.tag}`,
       auth: {
         bearer
       },
@@ -213,7 +199,7 @@ const getManifestOfSourceImage = callback => {
         if (options.verbose) {
           console.log('source manifest:', manifestSource);
         }
-        callback(null);
+        return callback(null);
       }
     }
   );
@@ -222,9 +208,7 @@ const getManifestOfSourceImage = callback => {
 const getConfigOfSourceImage = callback => {
   request(
     {
-      url: `https://registry-1.docker.io/v2/${options.images.src.org}/${
-        options.images.src.image
-      }/blobs/${manifestSource.config.digest}`,
+      url: `https://${options.images.src.registry}/v2/${options.images.src.imagepath}/blobs/${manifestSource.config.digest}`,
       auth: {
         bearer
       },
@@ -250,6 +234,11 @@ const getConfigOfSourceImage = callback => {
 };
 
 const getTokenForTargetBaseImage = callback => {
+  if (options.images.targetbase.registry !== 'registry-1.docker.io') {
+    bearer = '';
+    return callback(null);
+  }
+
   request(
     `https://auth.docker.io/token?account=${username}&scope=repository%3A${
       options.images.targetbase.org
@@ -280,26 +269,49 @@ const getManifestOfTargetBaseImage = callback => {
   );
   request(
     {
-      url: `https://registry-1.docker.io/v2/${options.images.targetbase.org}/${
-        options.images.targetbase.image
-      }/manifests/${options.images.targetbase.tag}`,
+      url: `https://${options.images.targetbase.registry}/v2/${options.images.targetbase.imagepath}/manifests/${options.images.targetbase.tag}`,
       auth: {
         bearer
       },
       json: true,
       headers: {
-        Accept: 'application/vnd.docker.distribution.manifest.v2+json'
+        Accept: 'application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.docker.distribution.manifest.v2+json'
       }
     },
     (err, res, body) => {
       if (err) {
         return callback(err);
       }
-      manifestTargetBase = body;
-      if (options.verbose) {
-        console.log('target base image manifest:', manifestTargetBase);
+      if (body.manifests) {
+        request(
+          {
+            url: `https://${options.images.targetbase.registry}/v2/${options.images.targetbase.imagepath}/manifests/${body.manifests[0].digest}`,
+            auth: {
+              bearer
+            },
+            json: true,
+            headers: {
+              Accept: 'application/vnd.docker.distribution.manifest.v2+json'
+            }
+          },
+          (err2, res2, body2) => {
+            if (err2) {
+              return callback(err2);
+            }
+
+          manifestTargetBase = body2;
+          if (options.verbose) {
+            console.log('target base image manifest:', manifestTargetBase);
+          }
+          return callback(null);
+        });
+      } else {
+        manifestTargetBase = body;
+        if (options.verbose) {
+          console.log('target base image manifest:', manifestTargetBase);
+        }
+        return callback(null);
       }
-      callback(null);
     }
   );
 };
@@ -307,9 +319,7 @@ const getManifestOfTargetBaseImage = callback => {
 const getConfigOfTargetBaseImage = callback => {
   request(
     {
-      url: `https://registry-1.docker.io/v2/${options.images.targetbase.org}/${
-        options.images.targetbase.image
-      }/blobs/${manifestTargetBase.config.digest}`,
+      url: `https://${options.images.targetbase.registry}/v2/${options.images.targetbase.imagepath}/blobs/${manifestTargetBase.config.digest}`,
       auth: {
         bearer
       },
@@ -343,6 +353,11 @@ const matchSourceBaseImage = callback => {
 };
 
 const getTokenForSourceBaseImage = callback => {
+  if (options.images.srcbase.registry !== 'registry-1.docker.io') {
+    bearer = '';
+    return callback(null);
+  }
+
   request(
     `https://auth.docker.io/token?account=${username}&scope=repository%3A${
       options.images.srcbase.org
@@ -368,14 +383,12 @@ const getTokenForSourceBaseImage = callback => {
 const getManifestOfSourceBaseImage = callback => {
   console.log(
     `Retrieving information about source base image ${
-      options.images.srcbase.org
-    }/${options.images.srcbase.image}:${options.images.srcbase.tag}`
+      options.images.srcbase.registry
+    }/${options.images.srcbase.imagepath}:${options.images.srcbase.tag}`
   );
   request(
     {
-      url: `https://registry-1.docker.io/v2/${options.images.srcbase.org}/${
-        options.images.srcbase.image
-      }/manifests/${options.images.srcbase.tag}`,
+      url: `https://${options.images.srcbase.registry}/v2/${options.images.srcbase.imagepath}/manifests/${options.images.srcbase.tag}`,
       auth: {
         bearer
       },
@@ -387,6 +400,9 @@ const getManifestOfSourceBaseImage = callback => {
     (err, res, body) => {
       if (err) {
         return callback(err);
+      }
+      if (res.statusCode >= 400) {
+        return callback(new Error(body.errors[0].code));
       }
       manifestSourceBase = body;
       if (options.verbose) {
@@ -400,9 +416,7 @@ const getManifestOfSourceBaseImage = callback => {
 const getConfigOfSourceBaseImage = callback => {
   request(
     {
-      url: `https://registry-1.docker.io/v2/${options.images.srcbase.org}/${
-        options.images.srcbase.image
-      }/blobs/${manifestSourceBase.config.digest}`,
+      url: `https://${options.images.srcbase.registry}/v2/${options.images.srcbase.imagepath}/blobs/${manifestSourceBase.config.digest}`,
       auth: {
         bearer
       },
@@ -428,6 +442,15 @@ const getConfigOfSourceBaseImage = callback => {
 };
 
 const getTokenForTargetImage = callback => {
+  if (options.images.target.registry !== 'registry-1.docker.io') {
+    bearer = '';
+    return callback(null);
+  }
+
+  if (!options.images.targetbase.org && options.images.targetbase.imagepath === 'windows/nanoserver') {
+    options.images.targetbase.org = 'stefanscherer';
+    options.images.targetbase.image = 'nanoserver';
+  }
   request(
     `https://auth.docker.io/token?account=${username}&scope=repository%3A${
       options.images.target.org
@@ -463,9 +486,7 @@ const beginUpload = callback => {
   request(
     {
       method: 'POST',
-      url: `https://registry-1.docker.io/v2/${options.images.target.org}/${
-        options.images.target.image
-      }/blobs/uploads/`,
+      url: `https://${options.images.target.registry}/v2/${options.images.target.imagepath}/blobs/uploads/`,
       auth: {
         bearer
       }
@@ -572,9 +593,7 @@ const checkConfigOfTargetImage = callback => {
   request(
     {
       method: 'HEAD',
-      url: `https://registry-1.docker.io/v2/${options.images.target.org}/${
-        options.images.target.image
-      }/blobs/${manifestTarget.config.digest}`,
+      url: `https://${options.images.target.registry}/v2/${options.images.target.imagepath}/blobs/${manifestTarget.config.digest}`,
       auth: {
         bearer
       }
@@ -611,9 +630,7 @@ const mountLayersForTargetImage = callback => {
       request(
         {
           method: 'HEAD',
-          url: `https://registry-1.docker.io/v2/${options.images.target.org}/${
-            options.images.target.image
-          }/blobs/${layer.digest}`,
+          url: `https://${options.images.target.registry}/v2/${options.images.target.imagepath}/blobs/${layer.digest}`,
           auth: {
             bearer
           }
@@ -634,11 +651,7 @@ const mountLayersForTargetImage = callback => {
             request(
               {
                 method: 'POST',
-                url: `https://registry-1.docker.io/v2/${
-                  options.images.target.org
-                }/${options.images.target.image}/blobs/uploads/?from=${
-                  options.images.src.org
-                }%2F${options.images.src.image}&mount=${layer.digest}`,
+                url: `https://${options.images.target.registry}/v2/${options.images.target.imagepath}/blobs/uploads/?from=${options.images.src.org}%2F${options.images.src.image}&mount=${layer.digest}`,
                 auth: {
                   bearer
                 },
@@ -659,13 +672,7 @@ const mountLayersForTargetImage = callback => {
                   return request(
                     {
                       method: 'POST',
-                      url: `https://registry-1.docker.io/v2/${
-                        options.images.target.org
-                      }/${options.images.target.image}/blobs/uploads/?from=${
-                        options.images.targetbase.org
-                      }%2F${options.images.targetbase.image}&mount=${
-                        layer.digest
-                      }`,
+                      url: `https://${options.images.target.registry}/v2/${options.images.target.imagepath}/blobs/uploads/?from=${options.images.targetbase.org}%2F${options.images.targetbase.image}&mount=${layer.digest}`,
                       auth: {
                         bearer
                       },
@@ -707,9 +714,7 @@ const uploadManifestForTargetImage = callback => {
   request(
     {
       method: 'PUT',
-      url: `https://registry-1.docker.io/v2/${options.images.target.org}/${
-        options.images.target.image
-      }/manifests/${options.images.target.tag}`,
+      url: `https://${options.images.target.registry}/v2/${options.images.target.imagepath}/manifests/${options.images.target.tag}`,
       auth: {
         bearer
       },
