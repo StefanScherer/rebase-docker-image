@@ -345,9 +345,11 @@ const getConfigOfTargetBaseImage = callback => {
 };
 
 const matchSourceBaseImage = callback => {
-  if (!options.images.srcbase || !options.images.srcbase.org) {
+  if (!options.images.srcbase || !(options.images.srcbase.org || options.images.srcbase.registry)) {
     options.images.srcbase = Object.assign({}, options.images.targetbase);
-    options.images.srcbase.tag = configSource['os.version'];
+    if (!options.images.srcbase.tag) {
+      options.images.srcbase.tag = configSource['os.version'];
+    }
   }
   callback(null);
 };
