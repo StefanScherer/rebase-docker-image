@@ -347,9 +347,8 @@ const getConfigOfTargetBaseImage = callback => {
 const matchSourceBaseImage = callback => {
   if (!options.images.srcbase || !(options.images.srcbase.org || options.images.srcbase.registry)) {
     options.images.srcbase = Object.assign({}, options.images.targetbase);
-    if (!options.images.srcbase.tag) {
-      options.images.srcbase.tag = configSource['os.version'];
-    }
+    // best guess is to use the os.version as tag name, otherwise use -s to specify exact source base image
+    options.images.srcbase.tag = configSource['os.version'];
   }
   callback(null);
 };
