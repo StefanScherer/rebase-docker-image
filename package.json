@@ -1,6 +1,6 @@
 {
   "name": "rebase-docker-image",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "Rebase a Windows Docker image",
   "main": "index.js",
   "scripts": {
@@ -12,10 +12,10 @@
     "rebase-docker-image": "index.js"
   },
   "dependencies": {
-    "async": "2.6.1",
-    "command-line-args": "5.0.2",
-    "command-line-usage": "5.0.5",
-    "request": "2.88.0",
+    "async": "3.1.1",
+    "command-line-args": "5.1.1",
+    "command-line-usage": "6.1.0",
+    "request": "2.88.2",
     "sha256": "0.2.0"
   },
   "devDependencies": {
