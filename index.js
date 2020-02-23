@@ -218,6 +218,9 @@ const getConfigOfSourceImage = callback => {
       if (err) {
         return callback(err);
       }
+      if (!body.rootfs) {
+        body.rootfs = body.rootfS;
+      }
       if (options.verbose) {
         console.log(
           'src image os:',
@@ -329,6 +332,9 @@ const getConfigOfTargetBaseImage = callback => {
       if (err) {
         return callback(err);
       }
+      if (!body.rootfs) {
+        body.rootfs = body.rootfS;
+      }
       if (options.verbose) {
         console.log(
           'target base image os:',
@@ -426,6 +432,9 @@ const getConfigOfSourceBaseImage = callback => {
     (err, res, body) => {
       if (err) {
         return callback(err);
+      }
+      if (!body.rootfs) {
+        body.rootfs = body.rootfS;
       }
       if (options.verbose) {
         console.log(
